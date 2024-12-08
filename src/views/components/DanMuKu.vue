@@ -14,7 +14,7 @@
 <script setup lang="ts">
 import { type danmuItemProps, type danmuItem } from "./DanMu";
 import DanMu from "./DanMu.vue";
-import { nextTick, onMounted, ref } from "vue";
+import { nextTick, onMounted, ref, watch } from "vue";
 import { getTextWidth, getTranslateXValue } from "@/utils/index";
 
 const itemRefs = ref<Record<string, InstanceType<typeof DanMu>>>({});
@@ -59,6 +59,8 @@ onMounted(() => {
   danmuData.value = handleDanmuData(tracksCount);
 });
 
+watch(() => list);
+
 // 初始化轨道
 function initTrack(tracksCount: number) {
   for (let index = 0; index < tracksCount; index++) {
@@ -69,48 +71,49 @@ function initTrack(tracksCount: number) {
 // 处理数据
 function handleDanmuData(tracksCount: number): danmuItemProps[] {
   return list.map((item) => {
-    const randomTrack = Math.floor(Math.random() * tracksCount);
-    const eleWidth = getTextWidth(item.content, item.style["--fontSize"]);
-    const distance = window.innerWidth + eleWidth;
-    const obj: danmuItemProps = {
-      id: item.id,
-      style: {
-        "--translateX": -distance + "px",
-        "--duration": distance / speed + "s",
-        "--top": randomTrack * trackHeight + "px",
-        "--fontSize": "25px",
-      },
-      content: item.content,
-      trackIndex: 0,
-    };
-
+    // const randomTrack = Math.floor(Math.random() * tracksCount);
+    const elWidth = getTextWidth(item.content, item.style["--fontSize"]);
+    const distance = window.innerWidth + elWidth;
+    const obj: danmuItemProps = {};
     // 加入轨道
     for (let index = 0; index < tracksArray.length; index++) {
       const track: danmuItem[] = tracksArray[index];
       if (track.length) {
+        // 计算这条轨道最后一个弹幕是否全部进入屏幕
         const lastItem = track[track.length - 1];
-        console.log("lastItem", lastItem);
+        let translateXValue: number | undefined = 0;
         nextTick(() => {
-          const danmuInstance: InstanceType<typeof DanMu> =
+          const lastDanmuInstance: InstanceType<typeof DanMu> =
             itemRefs.value[lastItem.id];
-          const a = getTranslateXValue(danmuInstance.$el);
-          console.log("zxzzzzzzzzz", item.id, danmuInstance.$el);
+          translateXValue = getTranslateXValue(lastDanmuInstance.$el);
         });
-
-        if (lastItem.isRolled) {
+        // 如果上一个弹幕已经全部进入屏幕
+        if (translateXValue && translateXValue > lastItem.width) {
           track.push({
-            id: obj.id,
+            id: item.id,
             isRolled: false,
             isEnd: false,
+            width: elWidth,
           });
+        } else {
+          continue;
         }
       } else {
         track.push({
-          id: obj.id,
+          id: item.id,
           isRolled: false,
           isEnd: false,
+          width: elWidth,
         });
       }
+      obj.id = item.id;
+      obj.style = {
+        "--translateX": -distance + "px",
+        "--duration": distance / speed + "s",
+        "--top": index * trackHeight + "px",
+        "--fontSize": "25px",
+      };
+      obj.content = item.content;
       obj.trackIndex = index;
     }
     return obj;
