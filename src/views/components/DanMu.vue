@@ -1,6 +1,6 @@
 <template>
   <div :style="props.style" class="danmu-item" @animationend="animationEnd">
-    {{ props.content }}
+    {{ props.content.trim() }}
   </div>
 </template>
 <script setup lang="ts">
@@ -50,7 +50,7 @@ const animationEnd = () => {
     top: var(--top, 0);
     opacity: var(--opacity, 1);
     will-change: transform, opacity, top, left;
-    animation: roll linear var(--duration) forwards infinite;
+    animation: roll linear var(--duration) forwards;
     white-space: pre;
 }
 </style>

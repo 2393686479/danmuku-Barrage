@@ -7,7 +7,9 @@
 import DanMuKu from "./views/components/DanMuKu.vue";
 </script>
 <style scoped>
-body {
+html,body {
   margin: 0;
+  padding: 0;
+  height: 100%;
 }
 </style>

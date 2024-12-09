@@ -8,7 +8,6 @@ function getTextWidth(content: string, fontSize: string): number {
   document.body.appendChild(_span);
   let width = _span.offsetWidth;
   document.body.removeChild(_span);
-  console.log("zzz", width);
   return width;
 }
 
@@ -20,7 +19,6 @@ function getTranslateXValue(targetElement: Element): number | undefined {
   if (parts && parts.length > 1) {
     const values = parts[1].split(",").map(parseFloat); // 将数值部分分割并转换为数字数组
     const translateXValue = values[4]; // 按照matrix的规范，第5个值（索引为4）就是translateX的值
-    console.log("translateX的值为:", translateXValue);
     return translateXValue;
   }
 }
