@@ -1,38 +1,36 @@
 <template>
   <div
-    :style="props.style"
+    :style="style"
     class="danmu-item"
-    :class="{ 'danmu-paused': props.isPaused, 'danmu-destoryed': props.isEnd }"
+    :class="{ 'danmu-paused': isPaused, 'danmu-destoryed': isEnd }"
     @animationend="animationEnd"
   >
-    {{ props.content }}
+    {{ content }}
   </div>
 </template>
 <script setup lang="ts">
 import { type danmuItemProps } from "./DanMu";
 
-const props = withDefaults(defineProps<danmuItemProps>(), {
-  id: "0",
-  style: () => {
-    return {
-      "--opacity": "0.8",
-      "--fontSize": "25px",
-      "--fontWeight": "bold",
-      "--color": "#ffffff",
-      "--translateX": "0px",
-      "--duration": "0s",
-      "--top": "0px",
-    };
+const {
+  id,
+  style = {
+    "--opacity": "0.8",
+    "--fontSize": "25px",
+    "--fontWeight": "bold",
+    "--color": "#ffffff",
+    "--translateX": "0px",
+    "--duration": "0s",
+    "--top": "0px",
   },
-  content: "",
-  trackIndex: 0,
-  isPaused: false,
-  isEnd: false
-});
+  isPaused = false,
+  isEnd = false,
+  content = "",
+  trackIndex = 0,
+} = defineProps<danmuItemProps>();
 
 const emit = defineEmits(["animationEnd"]);
 const animationEnd = () => {
-  emit("animationEnd", props.id, props.trackIndex);
+  emit("animationEnd", id, trackIndex);
 };
 </script>
 <style lang="scss" scoped>
@@ -62,7 +60,7 @@ const animationEnd = () => {
   animation-play-state: paused;
 }
 
-.danmu-destoryed{
+.danmu-destoryed {
   display: none;
 }
 </style>
