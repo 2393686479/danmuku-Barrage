@@ -2,43 +2,46 @@
   <div class="danmu-container" ref="container">
     <dan-mu
       v-for="(item, index) in danmuData"
+      :key="item.id"
       :ref="(el) => setComponentRef(el, item.id)"
       :id="item.id"
       :style="item.style"
       :content="item.content"
-      :trackIndex="item.trackIndex"
+      :track-index="item.trackIndex"
+      :is-paused="item.isPaused"
+      :is-end="item.isEnd"
       @animation-end="animationEnd"
     />
   </div>
   <div @click="addDanmu">增加弹幕</div>
+  <div @click="paused">暂停弹幕</div>
 </template>
 <script setup lang="ts">
 import { type danmuItemProps, type danmuItem } from "./DanMu";
 import DanMu from "./DanMu.vue";
-import { nextTick, onMounted, ref, watch } from "vue";
+import { onMounted, ref, watch } from "vue";
 import { getTextWidth, getTranslateXValue } from "@/utils/index";
 
 // 弹幕Refs
 const itemRefs = ref<Record<string, InstanceType<typeof DanMu>>>({});
-
 const setComponentRef = (
   el: InstanceType<typeof DanMu> | null,
   id: string,
 ): undefined => {
   if (el) {
     itemRefs.value[id] = el;
-    console.log("setComponentRef", itemRefs.value[id].$el);
   }
 };
+
 // 轨道高度
 const trackHeight = 30;
 // 轨道
 const tracksArray: danmuItem[][] = [];
 // 速度
 const speed = 200;
-// 弹幕数据
-const list = ref<Record<string, any>[]>([]);
-
+// 数据
+const list = ref<danmuItemProps[]>([]);
+// 添加弹幕按钮
 const addDanmu = () => {
   list.value.push({
     id: Math.random() * 10 + "",
@@ -48,37 +51,40 @@ const addDanmu = () => {
     content: "ssssssssss",
   });
 };
+const paused = () => {
+  danmuData.value = danmuData.value.map((item) => {
+    item.isPaused = true;
+    return item;
+  });
+};
+const initList = () => {
+  setInterval(() => {
+  list.value.push({
+    id: Math.random() * 10 + "",
+    style: {
+      "--fontSize": "25px",
+    },
+    content: "ssssssssss",
+  });
+  }, 1000);
+};
 
 const container = ref<HTMLDivElement>();
+// 弹幕数据
 const danmuData = ref<danmuItemProps[]>([]);
 
 onMounted(() => {
-  // 创建数据
-  // list.value.push({
-  //   id: "0",
-  //   style: {
-  //     "--fontSize": "25px",
-  //   },
-  //   content: "我是弹幕我是弹幕我是弹幕我是弹幕",
-  // });
+  initList();
   // 计算容纳多少个轨道
   const tracksCount = Math.floor(container.value!.offsetHeight / trackHeight);
-  nextTick(() => {
-    // console.log("qqqqqqqqqqqqqq", itemRefs.value);
-  });
-
   initTrack(tracksCount);
-  // danmuData.value = handleDanmuData(list.value);
 });
 
 watch(
   () => list,
   (newVal) => {
-    if (!isClean.value) {
-      console.log("watch");
-      danmuData.value = danmuData.value.concat(
-        handleDanmuData([newVal.value[newVal.value.length - 1]]),
-      );
+    if (!isCleaning.value) {
+      findIsEndItem(handleDanmuData(newVal.value[newVal.value.length - 1]));
     }
   },
   {
@@ -94,118 +100,113 @@ function initTrack(tracksCount: number) {
   }
 }
 
-const isClean = ref<boolean>(false);
+// 标记，防止执行watch方法里面的操作
+const isCleaning = ref<boolean>(false);
+// 处理数据, 将数据放在合适的轨道，组装成弹幕数据
+const handleDanmuData = (danmuDataItem: danmuItemProps): danmuItemProps => {
+  const elWidth = getTextWidth(
+    danmuDataItem.content,
+    danmuDataItem.style["--fontSize"],
+  );
+  const distance = window.innerWidth + elWidth;
+  const obj: danmuItemProps = {
+    id: "",
+    content: "",
+    style: {
+      "--fontSize": "",
+    },
+  };
 
-// 处理数据
-function handleDanmuData(list: Record<string, any>[]): danmuItemProps[] {
-  return list.map((item) => {
-    const elWidth = getTextWidth(item.content, item.style["--fontSize"]);
-    const distance = window.innerWidth + elWidth;
-    const obj: danmuItemProps = {};
+  let trackIndex = 0;
+  // 加入轨道
+  for (trackIndex = 0; trackIndex < tracksArray.length; trackIndex++) {
+    const track: danmuItem[] = tracksArray[trackIndex];
+    // console.log("轨道为", trackIndex, "弹幕Id为", item.id);
+    if (track.length > 0) {
+      // 计算这条轨道最后一个弹幕是否全部进入屏幕
+      let lastItem = track[track.length - 1];
 
-    let trackIndex = 0;
-    // 加入轨道
-    for (trackIndex = 0; trackIndex < tracksArray.length; trackIndex++) {
-      console.log("tranckIndex", trackIndex)
-      const track: danmuItem[] = tracksArray[trackIndex];
-      console.log("轨道为", trackIndex, "弹幕Id为", item.id);
-      if (track.length !== 0) {
-        // 计算这条轨道最后一个弹幕是否全部进入屏幕
-        let lastItem = track[track.length - 1];
+      // 如果最后一个弹幕已经走完了
+      if (lastItem.isEnd) {
+        // 弹出已经走完的弹幕
+        isCleaning.value = true;
+        track.pop();
+        isCleaning.value = false;
+      }
 
-        // 循环判断：如果最后一个弹幕已经走完了
-        while (track.length >= 1 && lastItem.isEnd) {
-          // 弹出已经走完的弹幕
-          lastItem = track[track.length - 1];
-          track.pop();
-          isClean.value = true;
-        }
-        isClean.value = false;
-        // 弹出走完的弹幕后，该轨道没有弹幕了，直接push
-        if (track.length === 0) {
-          track.push({
-            id: item.id,
-            isEnd: false,
-            width: elWidth,
-          });
-          break;
-        }
-
-        let translateXValue: number | undefined = 0;
-        let lastDanmuInstance: InstanceType<typeof DanMu>;
-
-        lastDanmuInstance = itemRefs.value[lastItem.id];
-        // console.log("最后一个item", lastDanmuInstance.$el);
-        translateXValue = getTranslateXValue(lastDanmuInstance.$el);
-        if (translateXValue && -1 * translateXValue > lastItem.width) {
-          console.log("上一个弹幕已全部进入屏幕，放入第", trackIndex, "个轨道");
-          track.push({
-            id: item.id,
-            isEnd: false,
-            width: elWidth,
-          });
-          break;
-        }
-        // 获取上一个弹幕走的路程
-        // nextTick(() => {
-        //   lastDanmuInstance = itemRefs.value[lastItem.id];
-        //   console.log("nexttick", lastDanmuInstance)
-        //   console.log("ssssssssssss", itemRefs.value[lastItem.id]);
-        //   translateXValue = getTranslateXValue(lastDanmuInstance.$el);
-        // }).then(() => {
-        //   console.log(
-        //     "获取上一个弹幕走的路程",
-        //     lastItem.id,
-        //     translateXValue,
-        //     lastItem.width,
-        //   );
-        //   // 如果上一个弹幕已经全部进入屏幕，就放入该轨道
-        //   if (translateXValue && -1 * translateXValue > lastItem.width) {
-        //     console.log(
-        //       "上一个弹幕已全部进入屏幕，放入第",
-        //       trackIndex,
-        //       "个轨道",
-        //     );
-        //     track.push({
-        //       id: item.id,
-        //       isEnd: false,
-        //       width: elWidth,
-        //     });
-
-        //     nextTickBreak = true
-        //   }
-        // });
-      } else {
-        console.log("id为", item.id, "的弹幕直接放进轨道");
+      // 弹出走完的弹幕后，如果该轨道没有弹幕了，直接push
+      if (track.length === 0) {
         track.push({
-          id: item.id,
+          id: danmuDataItem.id,
           isEnd: false,
           width: elWidth,
         });
         break;
       }
+
+      let translateXValue: number | undefined = 0;
+      const lastDanmuInstance = itemRefs.value[lastItem.id];
+      // console.log("最后一个item", lastDanmuInstance.$el);
+      translateXValue = getTranslateXValue(lastDanmuInstance.$el);
+      // 保证上一个弹幕已经完全进入屏幕
+      if (translateXValue && -1 * translateXValue > lastItem.width) {
+        // console.log("上一个弹幕已全部进入屏幕，放入第", trackIndex, "个轨道");
+        track.push({
+          id: danmuDataItem.id,
+          isEnd: false,
+          width: elWidth,
+        });
+        break;
+      }
+    } else {
+      // console.log("id为", item.id, "的弹幕直接放进轨道");
+      track.push({
+        id: danmuDataItem.id,
+        isEnd: false,
+        width: elWidth,
+      });
+      break;
     }
-    obj.id = item.id;
-    obj.style = {
-      "--translateX": -distance + "px",
-      "--duration": distance / speed + "s",
-      "--top": trackIndex * trackHeight + "px",
-      "--fontSize": "25px",
-    };
-    obj.content = item.content;
-    obj.trackIndex = trackIndex;
-    return obj;
-  });
-}
+  }
+  obj.id = danmuDataItem.id;
+  obj.style = {
+    "--translateX": -distance + "px",
+    "--duration": distance / speed + "s",
+    "--top": trackIndex * trackHeight + "px",
+    "--fontSize": "25px",
+  };
+  obj.content = danmuDataItem.content;
+  obj.trackIndex = trackIndex;
+  obj.isPaused = false;
+  obj.isEnd = false;
+  return obj;
+};
+
+// 利用isEnd复用dom
+const findIsEndItem = (danmuDataItem: danmuItemProps) => {
+  isCleaning.value = true;
+  console.log("findIsEndItem", danmuDataItem, danmuData.value);
+  const item = danmuData.value.find((item) => item.isEnd);
+  if (item) {
+    Object.assign(item, danmuDataItem);
+  } else {
+    danmuData.value.push(danmuDataItem);
+    console.log("findIsEndItem没找到isEnd为true", danmuData.value);
+  }
+  isCleaning.value = false;
+};
 
 const animationEnd = (id: string, trackIndex: number) => {
   const track = tracksArray[trackIndex];
-  track.forEach((item) => {
-    if (item.id === id) {
-      console.log("item.id END", item.id);
-      item.isEnd = true;
-    }
-  });
+  setItemEnd(track, id);
+  setItemEnd(danmuData.value, id);
+};
+
+const setItemEnd = (array: danmuItem[] | danmuItemProps[], id: string) => {
+  const item = array.find((item) => item.id === id);
+  if (item) {
+    item.isEnd = true;
+  }
 };
 </script>
 <style lang="scss" scoped>
@@ -214,7 +215,7 @@ const animationEnd = (id: string, trackIndex: number) => {
   box-sizing: border-box;
   overflow: hidden;
   width: 100%;
-  height: 500px;
+  height: 520px;
   position: relative;
   background-color: black;
 }
