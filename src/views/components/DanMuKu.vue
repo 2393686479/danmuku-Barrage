@@ -59,13 +59,13 @@ const paused = () => {
 };
 const initList = () => {
   setInterval(() => {
-  list.value.push({
-    id: Math.random() * 10 + "",
-    style: {
-      "--fontSize": "25px",
-    },
-    content: "ssssssssss",
-  });
+    list.value.push({
+      id: Math.random() * 10 + "",
+      style: {
+        "--fontSize": "25px",
+      },
+      content: "ssssssssss",
+    });
   }, 1000);
 };
 
@@ -206,7 +206,18 @@ const setItemEnd = (array: danmuItem[] | danmuItemProps[], id: string) => {
   const item = array.find((item) => item.id === id);
   if (item) {
     item.isEnd = true;
+    scheduleCleanUp(item)
   }
+};
+// 5s过后删除未被复用的dom
+const scheduleCleanUp = (dItem: danmuItem | danmuItemProps) => {
+  setTimeout(() => {
+    if (dItem?.isEnd) {
+      isCleaning.value = true;
+      danmuData.value = danmuData.value.filter((item) => item.id !== dItem.id);
+      isCleaning.value = false;
+    }
+  }, 5000);
 };
 </script>
 <style lang="scss" scoped>
