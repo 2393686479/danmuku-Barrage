@@ -18,7 +18,7 @@ export interface danmuItemProps {
 }
 
 
-export interface danmuItem{
+export interface trackDanmuItem{
     id: string,
     // isRolled: boolean, // 一个弹幕是否已经全部进入屏幕
     isEnd: boolean // 一个弹幕是否已经全部出屏幕

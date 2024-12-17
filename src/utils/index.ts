@@ -1,4 +1,3 @@
-import DanMu from "../views/components/DanMu.vue";
 function getTextWidth(content: string, fontSize: string): number {
   const _span = document.createElement("span");
   _span.innerText = content;

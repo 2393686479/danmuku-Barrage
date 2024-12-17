@@ -17,7 +17,7 @@
   <div @click="paused">暂停弹幕</div>
 </template>
 <script setup lang="ts">
-import { type danmuItemProps, type danmuItem } from "./DanMu";
+import { type danmuItemProps, type trackDanmuItem } from "./DanMu";
 import DanMu from "./DanMu.vue";
 import { onMounted, ref, watch } from "vue";
 import { getTextWidth, getTranslateXValue } from "@/utils/index";
@@ -26,7 +26,7 @@ import { getTextWidth, getTranslateXValue } from "@/utils/index";
 const itemRefs = ref<Record<string, InstanceType<typeof DanMu>>>({});
 const setComponentRef = (
   el: InstanceType<typeof DanMu> | null,
-  id: string,
+  id: string
 ): undefined => {
   if (el) {
     itemRefs.value[id] = el;
@@ -36,9 +36,9 @@ const setComponentRef = (
 // 轨道高度
 const trackHeight = 30;
 // 轨道
-const tracksArray: danmuItem[][] = [];
+const tracksArray: trackDanmuItem[][] = [];
 // 速度
-const speed = 200;
+const speed = 50;
 // 数据
 const list = ref<danmuItemProps[]>([]);
 // 添加弹幕按钮
@@ -58,7 +58,8 @@ const paused = () => {
   });
 };
 const initList = () => {
-  setInterval(() => {
+  let a = 0;
+  let b = setInterval(() => {
     list.value.push({
       id: Math.random() * 10 + "",
       style: {
@@ -66,6 +67,10 @@ const initList = () => {
       },
       content: "ssssssssss",
     });
+    a++;
+    if (a === 3) {
+      clearInterval(b);
+    }
   }, 1000);
 };
 
@@ -84,12 +89,12 @@ watch(
   () => list,
   (newVal) => {
     if (!isCleaning.value) {
-      findIsEndItem(handleDanmuData(newVal.value[newVal.value.length - 1]));
+      reuseDom(handleDanmuData(newVal.value[newVal.value.length - 1]));
     }
   },
   {
     deep: true,
-  },
+  }
 );
 
 // 初始化轨道
@@ -102,11 +107,14 @@ function initTrack(tracksCount: number) {
 
 // 标记，防止执行watch方法里面的操作
 const isCleaning = ref<boolean>(false);
+
 // 处理数据, 将数据放在合适的轨道，组装成弹幕数据
-const handleDanmuData = (danmuDataItem: danmuItemProps): danmuItemProps => {
+const handleDanmuData = (
+  danmuDataItem: danmuItemProps
+): danmuItemProps | null => {
   const elWidth = getTextWidth(
     danmuDataItem.content,
-    danmuDataItem.style["--fontSize"],
+    danmuDataItem.style["--fontSize"]
   );
   const distance = window.innerWidth + elWidth;
   const obj: danmuItemProps = {
@@ -117,11 +125,17 @@ const handleDanmuData = (danmuDataItem: danmuItemProps): danmuItemProps => {
     },
   };
 
+  const trackDanmuItem: trackDanmuItem = {
+    id: danmuDataItem.id,
+    isEnd: false,
+    width: elWidth,
+  };
+
   let trackIndex = 0;
   // 加入轨道
   for (trackIndex = 0; trackIndex < tracksArray.length; trackIndex++) {
-    const track: danmuItem[] = tracksArray[trackIndex];
-    // console.log("轨道为", trackIndex, "弹幕Id为", item.id);
+    const track: trackDanmuItem[] = tracksArray[trackIndex];
+    console.log("轨道为", trackIndex, "弹幕Id为", danmuDataItem.id);
     if (track.length > 0) {
       // 计算这条轨道最后一个弹幕是否全部进入屏幕
       let lastItem = track[track.length - 1];
@@ -136,88 +150,100 @@ const handleDanmuData = (danmuDataItem: danmuItemProps): danmuItemProps => {
 
       // 弹出走完的弹幕后，如果该轨道没有弹幕了，直接push
       if (track.length === 0) {
-        track.push({
-          id: danmuDataItem.id,
-          isEnd: false,
-          width: elWidth,
-        });
+        track.push(trackDanmuItem);
         break;
       }
 
       let translateXValue: number | undefined = 0;
+      console.log("该轨道最后一个", lastItem.id);
       const lastDanmuInstance = itemRefs.value[lastItem.id];
       // console.log("最后一个item", lastDanmuInstance.$el);
       translateXValue = getTranslateXValue(lastDanmuInstance.$el);
       // 保证上一个弹幕已经完全进入屏幕
       if (translateXValue && -1 * translateXValue > lastItem.width) {
-        // console.log("上一个弹幕已全部进入屏幕，放入第", trackIndex, "个轨道");
-        track.push({
-          id: danmuDataItem.id,
-          isEnd: false,
-          width: elWidth,
-        });
+        console.log("上一个弹幕已全部进入屏幕，放入第", trackIndex, "个轨道");
+        track.push(trackDanmuItem);
         break;
       }
     } else {
-      // console.log("id为", item.id, "的弹幕直接放进轨道");
-      track.push({
-        id: danmuDataItem.id,
-        isEnd: false,
-        width: elWidth,
-      });
+      console.log("id为", danmuDataItem.id, "的弹幕直接放进轨道");
+      track.push(trackDanmuItem);
       break;
     }
   }
-  obj.id = danmuDataItem.id;
-  obj.style = {
-    "--translateX": -distance + "px",
-    "--duration": distance / speed + "s",
-    "--top": trackIndex * trackHeight + "px",
-    "--fontSize": "25px",
-  };
-  obj.content = danmuDataItem.content;
-  obj.trackIndex = trackIndex;
-  obj.isPaused = false;
-  obj.isEnd = false;
-  return obj;
+  if (trackIndex < tracksArray.length) {
+    obj.id = danmuDataItem.id;
+    obj.style = {
+      "--translateX": -distance + "px",
+      "--duration": distance / speed + "s",
+      "--top": trackIndex * trackHeight + "px",
+      "--fontSize": "25px",
+    };
+    obj.content = danmuDataItem.content;
+    obj.trackIndex = trackIndex;
+    obj.isPaused = false;
+    obj.isEnd = false;
+    return obj;
+  } else {
+    console.log("scheduleWorkscheduleWork");
+    // 如果没有找到合适的轨道，一段时间后再次寻找
+    scheduleWork(() => reuseDom(handleDanmuData(danmuDataItem)), 2000);
+    return null;
+  }
 };
 
 // 利用isEnd复用dom
-const findIsEndItem = (danmuDataItem: danmuItemProps) => {
-  isCleaning.value = true;
-  console.log("findIsEndItem", danmuDataItem, danmuData.value);
-  const item = danmuData.value.find((item) => item.isEnd);
-  if (item) {
-    Object.assign(item, danmuDataItem);
-  } else {
-    danmuData.value.push(danmuDataItem);
-    console.log("findIsEndItem没找到isEnd为true", danmuData.value);
+const reuseDom = (danmuDataItem: danmuItemProps | null) => {
+  if (danmuDataItem) {
+    isCleaning.value = true;
+    // console.log("findIsEndItem", danmuDataItem, danmuData.value);
+    const item = danmuData.value.find((item) => item.isEnd);
+    if (item) {
+      // 复用dom
+      Object.assign(item, danmuDataItem);
+    } else {
+      // 创建新dom
+      danmuData.value.push(danmuDataItem);
+      // console.log("findIsEndItem没找到isEnd为true", danmuData.value);
+    }
+    isCleaning.value = false;
   }
-  isCleaning.value = false;
 };
 
+// 弹幕动画完成后
 const animationEnd = (id: string, trackIndex: number) => {
   const track = tracksArray[trackIndex];
   setItemEnd(track, id);
-  setItemEnd(danmuData.value, id);
+  const danmuItem = setItemEnd(danmuData.value, id);
+  scheduleCleanUp(danmuItem);
 };
 
-const setItemEnd = (array: danmuItem[] | danmuItemProps[], id: string) => {
+// 在track、danmuData中找到动画完成的dom，isEnd设为true
+const setItemEnd = (
+  array: trackDanmuItem[] | danmuItemProps[],
+  id: string
+): trackDanmuItem | danmuItemProps | null => {
   const item = array.find((item) => item.id === id);
   if (item) {
     item.isEnd = true;
-    scheduleCleanUp(item)
+    return item;
   }
+  return null;
 };
+
 // 5s过后删除未被复用的dom
-const scheduleCleanUp = (dItem: danmuItem | danmuItemProps) => {
-  setTimeout(() => {
+const scheduleCleanUp = (dItem: trackDanmuItem | danmuItemProps | null) => {
+  scheduleWork(() => {
     if (dItem?.isEnd) {
       isCleaning.value = true;
       danmuData.value = danmuData.value.filter((item) => item.id !== dItem.id);
       isCleaning.value = false;
     }
   }, 5000);
+};
+
+const scheduleWork = (fn: Function, delay: number) => {
+  setTimeout(fn, delay);
 };
 </script>
 <style lang="scss" scoped>
@@ -226,7 +252,7 @@ const scheduleCleanUp = (dItem: danmuItem | danmuItemProps) => {
   box-sizing: border-box;
   overflow: hidden;
   width: 100%;
-  height: 520px;
+  height: 80px;
   position: relative;
   background-color: black;
 }
